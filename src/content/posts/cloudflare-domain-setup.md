@@ -24,8 +24,6 @@ Cloudflare 提供免费的全球 CDN、DNS 解析、DDoS 防护、免费 SSL 等
 3. 输入邮箱 + 密码 → 创建账号
 4. 去邮箱接收验证邮件，点击链接完成验证
 
-> **截图建议**：这里插入 Cloudflare 注册页面截图（邮箱密码输入框）
-
 登录后进入仪表板（dashboard）：https://dash.cloudflare.com/
 
 ## 步骤 2：添加站点（Add a Site）
@@ -35,16 +33,12 @@ Cloudflare 提供免费的全球 CDN、DNS 解析、DDoS 防护、免费 SSL 等
 
 2. 输入你的**根域名**（如 example.com，不要加 http/https 或 www），点击 **Add site**
 
-> **截图建议**：插入 “Add a Site” 输入域名界面截图
-
 3. 选择套餐：直接选 **Free**（免费版已足够强大，包含 CDN、SSL、DDoS 防护），点击 **Continue**
 
 4. Cloudflare 会自动扫描你现有的 DNS 记录（如果域名之前有解析）  
    - 通常会导入 A、CNAME、MX 等记录  
    - **仔细检查**：确保你的主机 IP（A 记录）正确。如果缺失，手动添加  
    - 确认无误后点击 **Continue**
-
-> **截图建议**：插入 DNS 记录扫描结果页面截图（橙色云图标表示代理开启）
 
 ## 步骤 3：修改域名 Nameservers（最关键一步）
 
@@ -58,8 +52,6 @@ Cloudflare 提供免费的全球 CDN、DNS 解析、DDoS 防护、免费 SSL 等
 5. 删除原有 NS，填入 Cloudflare 提供的两条 NS
 6. 保存提交
 
-> **截图建议**：插入 Namecheap / 阿里云 修改 NS 的后台截图（前后对比）
-
 **注意**：
 - 修改 NS 后，全网 DNS 传播需要 **几分钟到 24 小时**（通常 1–4 小时）
 - 期间网站可能短暂不可访问（正常现象）
@@ -70,8 +62,6 @@ Cloudflare 提供免费的全球 CDN、DNS 解析、DDoS 防护、免费 SSL 等
 1. 回到 Cloudflare 仪表板，点击 **Check nameservers** 或刷新页面
 2. 等状态变为 **Active**（活跃），表示接入成功
 3. Cloudflare 会发邮件通知你“站点已激活”
-
-> **截图建议**：插入站点状态变为 Active 的页面截图
 
 ## 步骤 5：添加/优化 DNS 记录（必须做）
 
@@ -87,8 +77,6 @@ Cloudflare 提供免费的全球 CDN、DNS 解析、DDoS 防护、免费 SSL 等
    - SSL/TLS → **Edge Certificates** → 开启 **Always Use HTTPS**
    - SSL/TLS → **Edge Certificates** → 开启 **Automatic HTTPS Rewrites**
 
-> **截图建议**：插入 DNS Records 列表 + 橙色云开启截图
-
 ## 步骤 6：测试 & 常见优化
 
 1. 等 DNS 生效后，浏览器访问你的域名
@@ -97,8 +85,6 @@ Cloudflare 提供免费的全球 CDN、DNS 解析、DDoS 防护、免费 SSL 等
    - Speed → **Optimization** → 开启 Auto Minify（压缩 JS/CSS/HTML）
    - Caching → **Configuration** → Cache Level 选 **Standard**
    - Security → **WAF** → 开启托管规则（Managed Rules）
-
-> **截图建议**：插入浏览器开发者工具显示 cf 开头的响应头截图
 
 ## 常见问题 Q&A
 
