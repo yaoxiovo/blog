@@ -1,0 +1,5 @@
+name = "blog"          # 随便填，比如 fuwari-site
+compatibility_date = "2025-12-31"
+
+[assets]
+directory = "./dist"
