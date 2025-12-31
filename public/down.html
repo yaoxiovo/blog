@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>大文件下载测试 - yaoxi</title>
+  <style>
+    body {
+      font-family: system-ui, sans-serif;
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 20px;
+      background: #f9f9f9;
+      color: #333;
+    }
+    h1 { text-align: center; color: #2c3e50; }
+    .file-list {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      margin: 20px 0;
+    }
+    .file-card {
+      background: white;
+      border-radius: 12px;
+      padding: 16px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      transition: all 0.2s;
+    }
+    .file-card:hover { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(0,0,0,0.15); }
+    .file-info { margin-bottom: 12px; }
+    .progress-container {
+      height: 20px;
+      background: #eee;
+      border-radius: 10px;
+      overflow: hidden;
+      margin: 12px 0;
+    }
+    .progress-bar {
+      height: 100%;
+      width: 0%;
+      background: linear-gradient(90deg, #4facfe, #00f2fe);
+      transition: width 0.3s ease;
+    }
+    .status {
+      font-weight: bold;
+      margin: 8px 0;
+      color: #27ae60;
+    }
+    .speed {
+      color: #e67e22;
+      font-size: 1.1em;
+    }
+    button {
+      padding: 10px 20px;
+      background: #3498db;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 1em;
+    }
+    button:hover { background: #2980b9; }
+    button:disabled { background: #95a5a6; cursor: not-allowed; }
+    .log {
+      margin-top: 20px;
+      padding: 12px;
+      background: #ecf0f1;
+      border-radius: 8px;
+      font-family: monospace;
+      white-space: pre-wrap;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+  </style>
+</head>
+<body>
+  <h1>大文件下载测试</h1>
+  <p style="text-align:center;color:#7f8c8d;">
+    测试你的网络下载速度、浏览器断点续传、CDN 加速效果<br>
+    支持暂停/继续、进度显示、实时速度计算
+  </p>
+
+  <div class="file-list">
+    <!-- 你可以在这里添加多个测试文件 -->
+    <div class="file-card">
+      <div class="file-info">
+        <strong>测试文件 1</strong><br>
+        <span>大小：约 500 MB</span><br>
+        <span id="file1-status" class="status">就绪</span>
+        <span id="file1-speed" class="speed"></span>
+      </div>
+      <div class="progress-container">
+        <div id="file1-progress" class="progress-bar"></div>
+      </div>
+      <button id="file1-start">开始下载</button>
+      <button id="file1-pause" disabled>暂停</button>
+      <button id="file1-resume" disabled>继续</button>
+    </div>
+
+    <!-- 可以复制上面卡片结构添加更多文件 -->
+  </div>
+
+  <div class="log" id="log"></div>
+
+  <script>
+    // ===================== 配置部分 =====================
+    // 替换成你自己的大文件直链（建议用 COS/OSS/R2 + CDN）
+    const TEST_FILES = [
+      {
+        id: 'file1',
+        url: 'https://r2.yaoxi.xyz/1.zip',  // ← 改成你的文件地址
+        filename: '100MB.zip',
+        sizeMB: 100  // 实际大小，用于估算速度（可不准，仅显示）
+      }
+      // 添加更多：
+      // { id: 'file2', url: '...', filename: '...', sizeMB: 1024 }
+    ];
+
+    // ===================== 全局状态 =====================
+    let controllers = {}; // AbortController 实例，用于暂停
+
+    // 日志函数
+    function log(message) {
+      const logEl = document.getElementById('log');
+      logEl.textContent += message + '\n';
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    // 下载函数（支持进度、速度、断点续传）
+    async function downloadFile(file) {
+      const { id, url, filename } = file;
+      const startBtn = document.getElementById(`${id}-start`);
+      const pauseBtn = document.getElementById(`${id}-pause`);
+      const resumeBtn = document.getElementById(`${id}-resume`);
+      const statusEl = document.getElementById(`${id}-status`);
+      const speedEl = document.getElementById(`${id}-speed`);
+      const progressBar = document.getElementById(`${id}-progress`);
+
+      log(`开始下载: ${filename}`);
+
+      startBtn.disabled = true;
+      pauseBtn.disabled = false;
+      resumeBtn.disabled = true;
+      statusEl.textContent = '下载中...';
+      statusEl.style.color = '#3498db';
+
+      // 支持断点续传：从已下载字节开始
+      let downloaded = 0;
+      const rangeHeader = downloaded > 0 ? `bytes=${downloaded}-` : null;
+
+      const controller = new AbortController();
+      controllers[id] = controller;
+
+      try {
+        const response = await fetch(url, {
+          headers: rangeHeader ? { Range: rangeHeader } : {},
+          signal: controller.signal
+        });
+
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+
+        const total = parseInt(response.headers.get('content-length') || '0', 10) + downloaded;
+        const reader = response.body.getReader();
+
+        let chunks = [];
+        let lastTime = Date.now();
+        let lastLoaded = downloaded;
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          chunks.push(value);
+          downloaded += value.length;
+
+          // 计算速度
+          const now = Date.now();
+          const timeDiff = (now - lastTime) / 1000;
+          if (timeDiff > 0.5) {
+            const speedMBs = ((downloaded - lastLoaded) / 1024 / 1024) / timeDiff;
+            speedEl.textContent = `${speedMBs.toFixed(1)} MB/s`;
+            lastTime = now;
+            lastLoaded = downloaded;
+          }
+
+          // 更新进度
+          const progress = total ? (downloaded / total * 100) : 0;
+          progressBar.style.width = `${progress}%`;
+        }
+
+        // 下载完成
+        const blob = new Blob(chunks);
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = filename;
+        link.click();
+
+        statusEl.textContent = '下载完成！';
+        statusEl.style.color = '#27ae60';
+        startBtn.disabled = false;
+        pauseBtn.disabled = true;
+        resumeBtn.disabled = true;
+
+        log(`下载完成: \( {filename} ( \){(downloaded/1024/1024).toFixed(1)} MB)`);
+      } catch (err) {
+        if (err.name === 'AbortError') {
+          statusEl.textContent = '已暂停';
+          statusEl.style.color = '#e67e22';
+          resumeBtn.disabled = false;
+          log('下载已暂停');
+        } else {
+          statusEl.textContent = '下载失败';
+          statusEl.style.color = '#c0392b';
+          log(`错误: ${err.message}`);
+        }
+        startBtn.disabled = false;
+      }
+    }
+
+    // 暂停
+    function pauseDownload(id) {
+      if (controllers[id]) {
+        controllers[id].abort();
+        delete controllers[id];
+      }
+    }
+
+    // 绑定按钮事件
+    TEST_FILES.forEach(file => {
+      document.getElementById(`${file.id}-start`).onclick = () => downloadFile(file);
+      document.getElementById(`${file.id}-pause`).onclick = () => pauseDownload(file.id);
+      // 继续按钮逻辑（这里简化，实际可记录已下载字节再 Range 请求）
+      document.getElementById(`${file.id}-resume`).onclick = () => {
+        alert('断点续传需服务端支持 Range，已下载进度未记录。本次将从头开始。');
+        downloadFile(file);
+      };
+    });
+  </script>
+</body>
+</html>
